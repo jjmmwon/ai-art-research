@@ -117,9 +117,6 @@ def prepare_data(
 
     X = data[features]
 
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-
     return X, features
 
 
@@ -127,8 +124,7 @@ def evaluate_model(
     model: ModelType,
     X: pd.DataFrame,
     y: pd.Series,
-    hparams: dict = {},
-    scoring: str = "neg_mean_absolute_error",
+    scoring: str = "MAE",
 ) -> float:
     """
     Evaluate the specified model using cross-validation.
@@ -143,36 +139,40 @@ def evaluate_model(
     Returns:
         float: Mean cross-validation score.
     """
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+    scoring_dict = {
+        "MAE": "neg_mean_absolute_error",
+        "MSE": "neg_mean_squared_error",
+        "R2": "r2",
+    }
 
     if model == "FastforwardNN":
-        return evaluate_ffnn(X, y)[0]
+        return evaluate_ffnn(X, y, scoring=scoring)[0]
 
-    model = get_model(model, hparams)
+    model = get_model(model)
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    cv_scores = cross_val_score(model, X, y, cv=kf, scoring=scoring)
+    cv_scores = cross_val_score(model, X, y, cv=kf, scoring=scoring_dict[scoring])
     return np.abs(cv_scores.mean())
 
 
-def compare_models(X: pd.DataFrame, y: np.ndarray) -> pd.DataFrame:
+def compare_models(X: pd.DataFrame, y: np.ndarray, scoring="MAE") -> pd.DataFrame:
     """
-    Compare the performance of multiple models using cross-validation.
+       Compare the performance of multiple models using cross-validation.
 
-    Args:
-        X (pd.DataFrame): Feature matrix.
-        y (pd.Series): Target vector.
-        models (list[ModelType]): List of models to compare.
-        hparams (dict): Hyperparameters for the models.
+       Args:
+           X (pd.DataFrame): Feature matrix.
+           y (pd.Series): Target vector.
+           models (list[ModelType]): List of models to compare.
+    (dict): Hyperparameters for the models.
 
-    Returns:
-        pd.DataFrame: DataFrame of model scores.
+       Returns:
+           pd.DataFrame: DataFrame of model scores.
     """
-    hparams = {"kernel": "linear"}
 
     model_scores = {}
     for model in MODEL_CLASSES:
-        if model == "SVR":
-            model_scores[model] = evaluate_model(model, X, y, hparams)
-        else:
-            model_scores[model] = evaluate_model(model, X, y)
+        model_scores[model] = evaluate_model(model, X, y, scoring)
 
     return model_scores

@@ -5,6 +5,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
+scoring_dict = {
+    "MAE": nn.L1Loss(),
+    "MSE": nn.MSELoss(),
+    "R2": nn.MSELoss(),
+}
+
 
 # Define the feedforward neural network model
 class FeedforwardNN(nn.Module):
@@ -42,7 +48,7 @@ def _evaluate_model(model, X_test, y_test, criterion):
     return test_loss
 
 
-def evaluate_model(X, y):
+def evaluate_model(X, y, scoring="neg_mean_absolute_error"):
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     test_scores = []
 
@@ -54,14 +60,19 @@ def evaluate_model(X, y):
         train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
 
         model = FeedforwardNN(input_dim=X_train.shape[1])
-        criterion = nn.L1Loss()
+        criterion = scoring_dict[scoring]
         optimizer = optim.Adam(model.parameters(), lr=0.001)
 
         _train_model(model, train_loader, criterion, optimizer)
 
-        test_loss = _evaluate_model(
-            model, torch.Tensor(X_test), torch.Tensor(y_test), criterion
-        )
+        if scoring == "r2":
+            test_loss = 1 - _evaluate_model(
+                model, torch.Tensor(X_test), torch.Tensor(y_test), criterion
+            ) / np.var(y_test)
+        else:
+            test_loss = _evaluate_model(
+                model, torch.Tensor(X_test), torch.Tensor(y_test), criterion
+            )
         test_scores.append(test_loss)
 
     return np.mean(test_scores), test_scores
