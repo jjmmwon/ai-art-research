@@ -1,1 +1,1 @@
-# AI-Art Study
+# AI-Art Research
